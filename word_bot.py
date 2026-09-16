@@ -1,3 +1,4 @@
+import os
 import asyncio
 import random
 import json
@@ -5,7 +6,7 @@ import os
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 
-TOKEN = ""
+TOKEN = os.getenv("BOT_TOKEN")
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
