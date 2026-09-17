@@ -29,9 +29,6 @@ stats = {}
 ACHIEVEMENTS_FILE = "achievements.json"
 achievements = {}
 
-# Игра "Виселица"
-hangman_state = {}
-
 CORRECT_PHRASES = [
     "Джонни Инглиш гордится тобой! 🎩",
     "Шпионская работа! Чисто. 🕶️",
@@ -167,31 +164,60 @@ async def check_achievements(message: types.Message, user_id: int, hangman_win: 
                 f"{ach['desc']}"
             )
 
-def get_menu():
+# Главное меню
+def get_main_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📚 Добавить слова", callback_data="menu_add")],
-        [InlineKeyboardButton(text="📝 Добавить фразы", callback_data="menu_addphrase")],
-        [InlineKeyboardButton(text="🔥 Тренировать слова", callback_data="menu_train")],
-        [InlineKeyboardButton(text="🎯 Тренировать фразы", callback_data="menu_trainphrase")],
-        [InlineKeyboardButton(text="🔄 Режим «наоборот»", callback_data="menu_reverse")],
-        [InlineKeyboardButton(text="🪢 Виселица", callback_data="menu_hangman")],
+        [InlineKeyboardButton(text="📚 Слова", callback_data="sub_words")],
+        [InlineKeyboardButton(text="📝 Фразы", callback_data="sub_phrases")],
+        [InlineKeyboardButton(text="🏆 Прогресс", callback_data="sub_progress")],
+        [InlineKeyboardButton(text="🎮 Игры", callback_data="sub_games")]
+    ])
+
+# Подменю "Слова"
+def get_words_menu():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📚 Добавить", callback_data="menu_add")],
+        [InlineKeyboardButton(text="🔥 Тренировать", callback_data="menu_train")],
+        [InlineKeyboardButton(text="🔄 Наоборот", callback_data="menu_reverse")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_main")]
+    ])
+
+# Подменю "Фразы"
+def get_phrases_menu():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📝 Добавить", callback_data="menu_addphrase")],
+        [InlineKeyboardButton(text="🎯 Тренировать", callback_data="menu_trainphrase")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_main")]
+    ])
+
+# Подменю "Прогресс"
+def get_progress_menu():
+    return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🧠 Выученное", callback_data="menu_learned")],
         [InlineKeyboardButton(text="🏆 Достижения", callback_data="menu_achievements")],
+        [InlineKeyboardButton(text="📊 Статистика", callback_data="menu_stats")],
         [InlineKeyboardButton(text="📤 Экспорт", callback_data="menu_export")],
-        [InlineKeyboardButton(text="📊 Статистика", callback_data="menu_stats")]
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_main")]
+    ])
+
+# Подменю "Игры"
+def get_games_menu():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🪢 Виселица", callback_data="menu_hangman")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="back_main")]
     ])
 
 @dp.message(Command("start"))
 async def start(message: types.Message):
     await message.answer(
         "Йоу, чувак. Я твой тренажёр слов.\n"
-        "Выбирай, что делаем:",
-        reply_markup=get_menu()
+        "Выбирай раздел:",
+        reply_markup=get_main_menu()
     )
 
 @dp.message(Command("menu"))
 async def menu(message: types.Message):
-    await message.answer("Меню:", reply_markup=get_menu())
+    await message.answer("Меню:", reply_markup=get_main_menu())
 
 @dp.message(Command("add"))
 async def add(message: types.Message):
@@ -269,7 +295,22 @@ async def handle_callback(call: types.CallbackQuery):
     user_id = call.from_user.id
     data = call.data
 
-    if data == "menu_add":
+    if data == "sub_words":
+        await call.message.edit_text("📚 Раздел «Слова»:", reply_markup=get_words_menu())
+
+    elif data == "sub_phrases":
+        await call.message.edit_text("📝 Раздел «Фразы»:", reply_markup=get_phrases_menu())
+
+    elif data == "sub_progress":
+        await call.message.edit_text("🏆 Раздел «Прогресс»:", reply_markup=get_progress_menu())
+
+    elif data == "sub_games":
+        await call.message.edit_text("🎮 Раздел «Игры»:", reply_markup=get_games_menu())
+
+    elif data == "back_main":
+        await call.message.edit_text("Главное меню:", reply_markup=get_main_menu())
+
+    elif data == "menu_add":
         mode[user_id] = "add"
         await call.message.answer("Кидай слова в формате: английское - русское.")
 
