@@ -64,7 +64,7 @@ async def handle(message: types.Message):
         else:
             await message.answer("Не понял. Формат: слово - перевод")
 
-    elif mode.get(user_id) == "train":
+        elif mode.get(user_id) == "train":
         if user_id not in current_word:
             eng = random.choice(list(words[user_id].keys()))
             current_word[user_id] = eng
@@ -73,10 +73,18 @@ async def handle(message: types.Message):
             eng = current_word[user_id]
             correct = words[user_id][eng]
             if text.lower() == correct.lower():
-                await message.answer("Верно! Дабл ю! 🔥")
+                await message.answer("Верно! 🔥")
             else:
                 await message.answer(f"Не то. Правильно: {correct}")
-            del current_word[user_id]
+
+            available = [w for w in words[user_id].keys() if w != eng]
+            if not available:
+                await message.answer("Ты прошёл все слова! Добавь новые через /add.")
+                del current_word[user_id]
+            else:
+                new_eng = random.choice(available)
+                current_word[user_id] = new_eng
+                await message.answer(f"Переведи: {new_eng}")
 
 if __name__ == "__main__":
     asyncio.run(dp.start_polling(bot))
