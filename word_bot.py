@@ -29,6 +29,9 @@ stats = {}
 ACHIEVEMENTS_FILE = "achievements.json"
 achievements = {}
 
+# Игра "Виселица"
+hangman_state = {}
+
 CORRECT_PHRASES = [
     "Джонни Инглиш гордится тобой! 🎩",
     "Шпионская работа! Чисто. 🕶️",
@@ -69,6 +72,7 @@ ALL_ACHIEVEMENTS = {
     "night_owl": {"name": "🌙 Полуночник", "desc": "Тренировка после 00:00", "need": 1, "type": "night"},
     "perfectionist": {"name": "🎯 Перфекционист", "desc": "10 правильных подряд", "need": 10, "type": "perfect"},
     "reverse_master": {"name": "🔄 Мастер реверса", "desc": "10 правильных ответов в режиме «наоборот»", "need": 10, "type": "reverse"},
+    "hangman_winner": {"name": "🪢 Палач", "desc": "Выиграть в Виселицу", "need": 1, "type": "hangman"},
 }
 
 if os.path.exists(STATS_FILE):
@@ -116,7 +120,7 @@ def save_learned():
     with open(LEARNED_FILE, "w", encoding="utf-8") as f:
         json.dump(learned, f, ensure_ascii=False, indent=2)
 
-async def check_achievements(message: types.Message, user_id: int):
+async def check_achievements(message: types.Message, user_id: int, hangman_win: bool = False):
     unlocked = achievements.get(user_id, [])
     learned_count = len(learned.get(user_id, {}))
     phrases_count = len(phrases.get(user_id, {}))
@@ -146,6 +150,8 @@ async def check_achievements(message: types.Message, user_id: int):
             value = perfect
         elif ach["type"] == "reverse":
             value = reverse
+        elif ach["type"] == "hangman":
+            value = 1 if hangman_win else 0
 
         if value >= ach["need"]:
             unlocked.append(key)
@@ -168,6 +174,7 @@ def get_menu():
         [InlineKeyboardButton(text="🔥 Тренировать слова", callback_data="menu_train")],
         [InlineKeyboardButton(text="🎯 Тренировать фразы", callback_data="menu_trainphrase")],
         [InlineKeyboardButton(text="🔄 Режим «наоборот»", callback_data="menu_reverse")],
+        [InlineKeyboardButton(text="🪢 Виселица", callback_data="menu_hangman")],
         [InlineKeyboardButton(text="🧠 Выученное", callback_data="menu_learned")],
         [InlineKeyboardButton(text="🏆 Достижения", callback_data="menu_achievements")],
         [InlineKeyboardButton(text="📤 Экспорт", callback_data="menu_export")],
@@ -290,6 +297,21 @@ async def handle_callback(call: types.CallbackQuery):
         else:
             mode[user_id] = "reverse"
             await call.message.answer("Режим «наоборот». Я кидаю русское слово, ты — английский перевод.")
+
+    elif data == "menu_hangman":
+        if user_id not in words or not words[user_id]:
+            await call.message.answer("У тебя пока нет слов для игры. Сначала добавь через /add.")
+        else:
+            word = random.choice(list(words[user_id].keys()))
+            hangman_state[user_id] = {"word": word, "guessed": [], "errors": 0}
+            display = " ".join(["_" if c not in " " else " " for c in word])
+            await call.message.answer(
+                f"🪢 Виселица\n\n"
+                f"Слово: {display}\n"
+                f"Ошибок: 0/6\n\n"
+                f"Угадывай буквы по одной."
+            )
+            mode[user_id] = "hangman"
 
     elif data == "menu_learned":
         if user_id not in learned or not learned[user_id]:
@@ -510,6 +532,38 @@ async def handle(message: types.Message):
                 new_eng = random.choice(available)
                 current_word[user_id] = words[user_id][new_eng]
                 await message.answer(f"Переведи на английский: {words[user_id][new_eng]}")
+
+    elif mode.get(user_id) == "hangman":
+        state = hangman_state.get(user_id)
+        if not state:
+            await message.answer("Начни игру заново через меню.")
+            return
+        if len(text) != 1 or not text.isalpha():
+            await message.answer("Отправь одну букву.")
+            return
+        letter = text.lower()
+        word = state["word"]
+        if letter in state["guessed"]:
+            await message.answer("Эту букву уже называл.")
+            return
+        state["guessed"].append(letter)
+        if letter not in word:
+            state["errors"] += 1
+        display = " ".join([c if c in state["guessed"] else "_" for c in word])
+        if all(c in state["guessed"] for c in word):
+            await message.answer(f"🎉 Ты угадал! Слово: {word}")
+            del hangman_state[user_id]
+            mode[user_id] = None
+            await check_achievements(message, user_id, hangman_win=True)
+        elif state["errors"] >= 6:
+            await message.answer(f"💀 Ты проиграл. Слово было: {word}")
+            del hangman_state[user_id]
+            mode[user_id] = None
+        else:
+            await message.answer(
+                f"Слово: {display}\n"
+                f"Ошибок: {state['errors']}/6"
+            )
 
 if __name__ == "__main__":
     asyncio.run(dp.start_polling(bot))
