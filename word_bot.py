@@ -19,6 +19,18 @@ current_word = {}
 LEARNED_FILE = "learned.json"
 learned = {}
 
+STATS_FILE = "stats.json"
+stats = {}
+
+if os.path.exists(STATS_FILE):
+    with open(STATS_FILE, "r", encoding="utf-8") as f:
+        stats = json.load(f)
+    stats = {int(k): v for k, v in stats.items()}
+
+def save_stats():
+    with open(STATS_FILE, "w", encoding="utf-8") as f:
+        json.dump(stats, f, ensure_ascii=False, indent=2)
+
 if os.path.exists(LEARNED_FILE):
     with open(LEARNED_FILE, "r", encoding="utf-8") as f:
         learned = json.load(f)
@@ -119,14 +131,46 @@ async def handle_callback(call: types.CallbackQuery):
             text = "\n".join([f"{k} → {v}" for k, v in learned[user_id].items()])
             await call.message.answer(f"Выученные слова:\n{text}")
 
-    elif data == "menu_stats":
+        elif data == "menu_stats":
+        user_id = call.from_user.id
         total = len(words.get(user_id, {}))
         learned_count = len(learned.get(user_id, {}))
+        all_words = total + learned_count
+
+        if all_words == 0:
+            await call.message.answer("У тебя пока нет слов. Добавь через /add.")
+            await call.answer()
+            return
+
+        percent = round(learned_count / all_words * 100)
+        today = str(date.today())
+
+        # Серия дней
+        user_stats = stats.get(user_id, {})
+        last_day = user_stats.get("last_day", "")
+        streak = user_stats.get("streak", 0)
+
+        if last_day != today:
+            yesterday = str(date.fromordinal(date.today().toordinal() - 1))
+            if last_day == yesterday:
+                streak += 1
+            else:
+                streak = 1
+            stats[user_id] = {"last_day": today, "streak": streak}
+            save_stats()
+
+        # Рекорд — самое длинное слово
+        longest = ""
+        if words.get(user_id):
+            longest = max(words[user_id].keys(), key=len)
+
         await call.message.answer(
-            f"📊 Твоя статистика:\n"
-            f"Слов в базе: {total}\n"
-            f"Выучено: {learned_count}\n"
-            f"Осталось: {total}"
+            f"📊 Твоя статистика:\n\n"
+            f"📚 Слов в базе: {total}\n"
+            f"🧠 Выучено: {learned_count}\n"
+            f"📈 Прогресс: {percent}%\n"
+            f"🔥 Серия дней: {streak}\n"
+            f"🏆 Рекорд: {longest if longest else '—'}"
         )
 
     await call.answer()
