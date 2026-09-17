@@ -2,6 +2,7 @@ import asyncio
 import random
 import json
 import os
+from datetime import date
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -49,7 +50,6 @@ def save_learned():
     with open(LEARNED_FILE, "w", encoding="utf-8") as f:
         json.dump(learned, f, ensure_ascii=False, indent=2)
 
-# Меню с кнопками
 def get_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📚 Добавить слова", callback_data="menu_add")],
@@ -107,7 +107,6 @@ async def learned_list(message: types.Message):
     text = "\n".join([f"{k} → {v}" for k, v in learned[user_id].items()])
     await message.answer(f"Выученные слова:\n{text}")
 
-# Обработка кнопок
 @dp.callback_query()
 async def handle_callback(call: types.CallbackQuery):
     user_id = call.from_user.id
@@ -131,8 +130,7 @@ async def handle_callback(call: types.CallbackQuery):
             text = "\n".join([f"{k} → {v}" for k, v in learned[user_id].items()])
             await call.message.answer(f"Выученные слова:\n{text}")
 
-        elif data == "menu_stats":
-        user_id = call.from_user.id
+    elif data == "menu_stats":
         total = len(words.get(user_id, {}))
         learned_count = len(learned.get(user_id, {}))
         all_words = total + learned_count
@@ -145,7 +143,6 @@ async def handle_callback(call: types.CallbackQuery):
         percent = round(learned_count / all_words * 100)
         today = str(date.today())
 
-        # Серия дней
         user_stats = stats.get(user_id, {})
         last_day = user_stats.get("last_day", "")
         streak = user_stats.get("streak", 0)
@@ -159,7 +156,6 @@ async def handle_callback(call: types.CallbackQuery):
             stats[user_id] = {"last_day": today, "streak": streak}
             save_stats()
 
-        # Рекорд — самое длинное слово
         longest = ""
         if words.get(user_id):
             longest = max(words[user_id].keys(), key=len)
