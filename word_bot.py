@@ -17,6 +17,8 @@ words = {}
 mode = {}
 current_word = {}
 
+hangman_state = {}
+
 PHRASES_FILE = "phrases.json"
 phrases = {}
 
