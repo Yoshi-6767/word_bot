@@ -26,14 +26,46 @@ learned = {}
 STATS_FILE = "stats.json"
 stats = {}
 
+ACHIEVEMENTS_FILE = "achievements.json"
+achievements = {}
+
+# Список всех достижений (скрытые до разблокировки)
+ALL_ACHIEVEMENTS = {
+    "first_blood": {"name": "🌱 Первая кровь", "desc": "Первое слово выучено", "need": 1, "type": "learned"},
+    "sniper": {"name": "🎯 Снайпер", "desc": "5 слов выучено", "need": 5, "type": "learned"},
+    "agent_010": {"name": "🥉 Агент 010", "desc": "10 слов выучено", "need": 10, "type": "learned"},
+    "agent_025": {"name": "🥈 Агент 025", "desc": "25 слов выучено", "need": 25, "type": "learned"},
+    "agent_050": {"name": "🥇 Агент 050", "desc": "50 слов выучено", "need": 50, "type": "learned"},
+    "agent_100": {"name": "🏆 Агент 100", "desc": "100 слов выучено", "need": 100, "type": "learned"},
+    "super_spy": {"name": "💎 Супершпион", "desc": "250 слов выучено", "need": 250, "type": "learned"},
+    "legend": {"name": "👑 Легенда разведки", "desc": "500 слов выучено", "need": 500, "type": "learned"},
+    "three_days": {"name": "🔥 Три дня в строю", "desc": "3 дня подряд", "need": 3, "type": "streak"},
+    "week_warrior": {"name": "⚡ Неделя без пропусков", "desc": "7 дней подряд", "need": 7, "type": "streak"},
+    "month_machine": {"name": "💪 Месяц дисциплины", "desc": "30 дней подряд", "need": 30, "type": "streak"},
+    "long_word": {"name": "📏 Длинномер", "desc": "Слово из 10+ букв в базе", "need": 10, "type": "long_word"},
+    "phrase_master": {"name": "🗣️ Мастер диалога", "desc": "10 фраз добавлено", "need": 10, "type": "phrases"},
+    "orator": {"name": "🎭 Оратор", "desc": "50 фраз добавлено", "need": 50, "type": "phrases"},
+    "night_owl": {"name": "🌙 Полуночник", "desc": "Тренировка после 00:00", "need": 1, "type": "night"},
+    "perfectionist": {"name": "🎯 Перфекционист", "desc": "10 правильных подряд", "need": 10, "type": "perfect"},
+}
+
 if os.path.exists(STATS_FILE):
     with open(STATS_FILE, "r", encoding="utf-8") as f:
         stats = json.load(f)
     stats = {int(k): v for k, v in stats.items()}
 
+if os.path.exists(ACHIEVEMENTS_FILE):
+    with open(ACHIEVEMENTS_FILE, "r", encoding="utf-8") as f:
+        achievements = json.load(f)
+    achievements = {int(k): v for k, v in achievements.items()}
+
 def save_stats():
     with open(STATS_FILE, "w", encoding="utf-8") as f:
         json.dump(stats, f, ensure_ascii=False, indent=2)
+
+def save_achievements():
+    with open(ACHIEVEMENTS_FILE, "w", encoding="utf-8") as f:
+        json.dump(achievements, f, ensure_ascii=False, indent=2)
 
 if os.path.exists(LEARNED_FILE):
     with open(LEARNED_FILE, "r", encoding="utf-8") as f:
@@ -62,6 +94,47 @@ def save_learned():
     with open(LEARNED_FILE, "w", encoding="utf-8") as f:
         json.dump(learned, f, ensure_ascii=False, indent=2)
 
+async def check_achievements(message: types.Message, user_id: int):
+    """Проверяет и выдаёт новые достижения."""
+    unlocked = achievements.get(user_id, [])
+    learned_count = len(learned.get(user_id, {}))
+    phrases_count = len(phrases.get(user_id, {}))
+    streak = stats.get(user_id, {}).get("streak", 0)
+    new_achievements = []
+
+    for key, ach in ALL_ACHIEVEMENTS.items():
+        if key in unlocked:
+            continue
+
+        value = 0
+        if ach["type"] == "learned":
+            value = learned_count
+        elif ach["type"] == "phrases":
+            value = phrases_count
+        elif ach["type"] == "streak":
+            value = streak
+        elif ach["type"] == "long_word":
+            if words.get(user_id):
+                longest = max(words[user_id].keys(), key=len)
+                value = len(longest)
+        elif ach["type"] == "night":
+            now = date.today()
+            value = 1 if now else 0
+
+        if value >= ach["need"]:
+            unlocked.append(key)
+            new_achievements.append(ach)
+
+    if new_achievements:
+        achievements[user_id] = unlocked
+        save_achievements()
+        for ach in new_achievements:
+            await message.answer(
+                f"🏆 ДОСТИЖЕНИЕ РАЗБЛОКИРОВАНО!\n"
+                f"{ach['name']}\n"
+                f"{ach['desc']}"
+            )
+
 def get_menu():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📚 Добавить слова", callback_data="menu_add")],
@@ -69,6 +142,7 @@ def get_menu():
         [InlineKeyboardButton(text="🔥 Тренировать слова", callback_data="menu_train")],
         [InlineKeyboardButton(text="🎯 Тренировать фразы", callback_data="menu_trainphrase")],
         [InlineKeyboardButton(text="🧠 Выученное", callback_data="menu_learned")],
+        [InlineKeyboardButton(text="🏆 Достижения", callback_data="menu_achievements")],
         [InlineKeyboardButton(text="📊 Статистика", callback_data="menu_stats")]
     ])
 
@@ -126,6 +200,7 @@ async def learn(message: types.Message):
     save()
     save_learned()
     await message.answer(f"Выучил: {word} → {learned[user_id][word]}")
+    await check_achievements(message, user_id)
 
 @dp.message(Command("learned"))
 async def learned_list(message: types.Message):
@@ -169,6 +244,18 @@ async def handle_callback(call: types.CallbackQuery):
         else:
             text = "\n".join([f"{k} → {v}" for k, v in learned[user_id].items()])
             await call.message.answer(f"Выученные слова:\n{text}")
+
+    elif data == "menu_achievements":
+        unlocked = achievements.get(user_id, [])
+        if not unlocked:
+            await call.message.answer("🏆 У тебя пока нет достижений. Учи слова — и они появятся!")
+        else:
+            text = "🏆 Твои достижения:\n\n"
+            for key in unlocked:
+                ach = ALL_ACHIEVEMENTS.get(key)
+                if ach:
+                    text += f"✅ {ach['name']} — {ach['desc']}\n"
+            await call.message.answer(text)
 
     elif data == "menu_stats":
         total = len(words.get(user_id, {}))
@@ -231,6 +318,7 @@ async def handle(message: types.Message):
             phrases.setdefault(user_id, {})[eng.strip().lower()] = rus.strip()
             save_phrases()
             await message.answer(f"Записал: {eng} → {rus}")
+            await check_achievements(message, user_id)
         else:
             await message.answer("Не понял. Формат: фраза - перевод")
 
