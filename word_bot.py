@@ -5,7 +5,7 @@ import os
 from datetime import date
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BufferedInputFile
 
 TOKEN = os.getenv("BOT_TOKEN")
 
@@ -170,6 +170,7 @@ def get_menu():
         [InlineKeyboardButton(text="🔄 Режим «наоборот»", callback_data="menu_reverse")],
         [InlineKeyboardButton(text="🧠 Выученное", callback_data="menu_learned")],
         [InlineKeyboardButton(text="🏆 Достижения", callback_data="menu_achievements")],
+        [InlineKeyboardButton(text="📤 Экспорт", callback_data="menu_export")],
         [InlineKeyboardButton(text="📊 Статистика", callback_data="menu_stats")]
     ])
 
@@ -238,6 +239,24 @@ async def learned_list(message: types.Message):
     text = "\n".join([f"{k} → {v}" for k, v in learned[user_id].items()])
     await message.answer(f"Выученные слова:\n{text}")
 
+@dp.message(Command("export"))
+async def export(message: types.Message):
+    user_id = message.from_user.id
+    if user_id not in words or not words[user_id]:
+        await message.answer("У тебя пока нет слов для экспорта.")
+        return
+    text = "МОИ СЛОВА\n\n"
+    for k, v in words[user_id].items():
+        text += f"{k} - {v}\n"
+    if user_id in phrases and phrases[user_id]:
+        text += "\n\nМОИ ФРАЗЫ\n\n"
+        for k, v in phrases[user_id].items():
+            text += f"{k} - {v}\n"
+    await message.answer_document(
+        BufferedInputFile(text.encode("utf-8"), filename="my_words.txt"),
+        caption="📤 Твой экспорт"
+    )
+
 @dp.callback_query()
 async def handle_callback(call: types.CallbackQuery):
     user_id = call.from_user.id
@@ -290,6 +309,22 @@ async def handle_callback(call: types.CallbackQuery):
                 if ach:
                     text += f"✅ {ach['name']} — {ach['desc']}\n"
             await call.message.answer(text)
+
+    elif data == "menu_export":
+        if user_id not in words or not words[user_id]:
+            await call.message.answer("У тебя пока нет слов для экспорта.")
+        else:
+            text = "МОИ СЛОВА\n\n"
+            for k, v in words[user_id].items():
+                text += f"{k} - {v}\n"
+            if user_id in phrases and phrases[user_id]:
+                text += "\n\nМОИ ФРАЗЫ\n\n"
+                for k, v in phrases[user_id].items():
+                    text += f"{k} - {v}\n"
+            await call.message.answer_document(
+                BufferedInputFile(text.encode("utf-8"), filename="my_words.txt"),
+                caption="📤 Твой экспорт"
+            )
 
     elif data == "menu_stats":
         total = len(words.get(user_id, {}))
@@ -450,7 +485,6 @@ async def handle(message: types.Message):
             await message.answer(f"Переведи на английский: {correct}")
         else:
             correct_eng = current_word[user_id]
-            # Находим русское слово по английскому
             rus = None
             for k, v in words[user_id].items():
                 if v == correct_eng:
