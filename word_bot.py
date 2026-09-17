@@ -1,4 +1,3 @@
-import os
 import asyncio
 import random
 import json
@@ -16,13 +15,11 @@ words = {}
 mode = {}
 current_word = {}
 
-# Загрузка слов из файла
 if os.path.exists(FILE):
     with open(FILE, "r", encoding="utf-8") as f:
         words = json.load(f)
     words = {int(k): v for k, v in words.items()}
 
-# Сохранение слов в файл
 def save():
     with open(FILE, "w", encoding="utf-8") as f:
         json.dump(words, f, ensure_ascii=False, indent=2)
@@ -64,7 +61,7 @@ async def handle(message: types.Message):
         else:
             await message.answer("Не понял. Формат: слово - перевод")
 
-        elif mode.get(user_id) == "train":
+    elif mode.get(user_id) == "train":
         if user_id not in current_word:
             eng = random.choice(list(words[user_id].keys()))
             current_word[user_id] = eng
