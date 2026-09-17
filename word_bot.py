@@ -29,7 +29,28 @@ stats = {}
 ACHIEVEMENTS_FILE = "achievements.json"
 achievements = {}
 
-# Список всех достижений (скрытые до разблокировки)
+CORRECT_PHRASES = [
+    "Джонни Инглиш гордится тобой! 🎩",
+    "Шпионская работа! Чисто. 🕶️",
+    "Есть! Цель поражена. 🎯",
+    "Британский акцент одобряет. ☕",
+    "Ты в ударе! Не останавливайся. 🔥",
+    "Хладнокровно. Профессионально. 🧊",
+    "Точно в цель, агент. 🎯",
+    "Я бы дал тебе орден, но пока только +1 к интеллекту. 🏅",
+]
+
+WRONG_PHRASES = [
+    "Мимо, агент. Правильно: {correct}",
+    "Провал миссии. Запомни: {correct}",
+    "Не то. Но Джонни тоже иногда падает в кусты. Правильно: {correct}",
+    "Хм. Это было смело. Но неправильно. Правильно: {correct}",
+    "Даже у Бонда бывают осечки. Правильно: {correct}",
+    "Твой ответ ушёл в архив неудач. Правильно: {correct}",
+    "Не угадал. Шпионская школа недовольна. Правильно: {correct}",
+    "Ошибка. Но это тоже опыт. Правильно: {correct}",
+]
+
 ALL_ACHIEVEMENTS = {
     "first_blood": {"name": "🌱 Первая кровь", "desc": "Первое слово выучено", "need": 1, "type": "learned"},
     "sniper": {"name": "🎯 Снайпер", "desc": "5 слов выучено", "need": 5, "type": "learned"},
@@ -95,11 +116,11 @@ def save_learned():
         json.dump(learned, f, ensure_ascii=False, indent=2)
 
 async def check_achievements(message: types.Message, user_id: int):
-    """Проверяет и выдаёт новые достижения."""
     unlocked = achievements.get(user_id, [])
     learned_count = len(learned.get(user_id, {}))
     phrases_count = len(phrases.get(user_id, {}))
     streak = stats.get(user_id, {}).get("streak", 0)
+    perfect = stats.get(user_id, {}).get("perfect", 0)
     new_achievements = []
 
     for key, ach in ALL_ACHIEVEMENTS.items():
@@ -118,8 +139,9 @@ async def check_achievements(message: types.Message, user_id: int):
                 longest = max(words[user_id].keys(), key=len)
                 value = len(longest)
         elif ach["type"] == "night":
-            now = date.today()
-            value = 1 if now else 0
+            value = 1
+        elif ach["type"] == "perfect":
+            value = perfect
 
         if value >= ach["need"]:
             unlocked.append(key)
@@ -331,9 +353,30 @@ async def handle(message: types.Message):
             eng = current_word[user_id]
             correct = words[user_id][eng]
             if text.lower() == correct.lower():
-                await message.answer("Верно! 🔥")
+                user_stats = stats.get(user_id, {})
+                perfect = user_stats.get("perfect", 0) + 1
+                user_stats["perfect"] = perfect
+                stats[user_id] = user_stats
+                save_stats()
+
+                phrase = random.choice(CORRECT_PHRASES)
+                if perfect == 3:
+                    phrase += "\n🔥 Три подряд! Ты разогрелся."
+                elif perfect == 5:
+                    phrase += "\n🏆 Пять подряд! Ты машина, агент."
+                elif perfect == 10:
+                    phrase += "\n👑 Десять! Ты не человек, ты легенда."
+
+                await message.answer(phrase)
+                await check_achievements(message, user_id)
             else:
-                await message.answer(f"Не то. Правильно: {correct}")
+                user_stats = stats.get(user_id, {})
+                user_stats["perfect"] = 0
+                stats[user_id] = user_stats
+                save_stats()
+
+                phrase = random.choice(WRONG_PHRASES).format(correct=correct)
+                await message.answer(phrase)
 
             available = [w for w in words[user_id].keys() if w != eng]
             if not available:
@@ -353,9 +396,30 @@ async def handle(message: types.Message):
             eng = current_word[user_id]
             correct = phrases[user_id][eng]
             if text.lower() == correct.lower():
-                await message.answer("Верно! 🔥")
+                user_stats = stats.get(user_id, {})
+                perfect = user_stats.get("perfect", 0) + 1
+                user_stats["perfect"] = perfect
+                stats[user_id] = user_stats
+                save_stats()
+
+                phrase = random.choice(CORRECT_PHRASES)
+                if perfect == 3:
+                    phrase += "\n🔥 Три подряд! Ты разогрелся."
+                elif perfect == 5:
+                    phrase += "\n🏆 Пять подряд! Ты машина, агент."
+                elif perfect == 10:
+                    phrase += "\n👑 Десять! Ты не человек, ты легенда."
+
+                await message.answer(phrase)
+                await check_achievements(message, user_id)
             else:
-                await message.answer(f"Не то. Правильно: {correct}")
+                user_stats = stats.get(user_id, {})
+                user_stats["perfect"] = 0
+                stats[user_id] = user_stats
+                save_stats()
+
+                phrase = random.choice(WRONG_PHRASES).format(correct=correct)
+                await message.answer(phrase)
 
             available = [w for w in phrases[user_id].keys() if w != eng]
             if not available:
