@@ -59,6 +59,28 @@ async def train(message: types.Message):
     mode[user_id] = "train"
     await message.answer("Погнали. Я буду кидать слово на английском, ты — перевод.")
 
+@dp.message(Command("learn"))
+async def learn(message: types.Message):
+    user_id = message.from_user.id
+    word = message.text.replace("/learn", "").strip().lower()
+    if user_id not in words or word not in words[user_id]:
+        await message.answer("Такого слова нет в базе.")
+        return
+    learned.setdefault(user_id, {})[word] = words[user_id][word]
+    del words[user_id][word]
+    save()
+    save_learned()
+    await message.answer(f"Выучил: {word} → {learned[user_id][word]}")
+
+@dp.message(Command("learned"))
+async def learned_list(message: types.Message):
+    user_id = message.from_user.id
+    if user_id not in learned or not learned[user_id]:
+        await message.answer("Ты пока нихуя не выучил.")
+        return
+    text = "\n".join([f"{k} → {v}" for k, v in learned[user_id].items()])
+    await message.answer(f"Выученные слова:\n{text}")
+
 @dp.message()
 async def handle(message: types.Message):
     user_id = message.from_user.id
@@ -82,7 +104,7 @@ async def handle(message: types.Message):
             eng = current_word[user_id]
             correct = words[user_id][eng]
             if text.lower() == correct.lower():
-                await message.answer("Верно! 🔥")
+                await message.answer("Верно! Дабл ю! 🔥")
             else:
                 await message.answer(f"Не то. Правильно: {correct}")
 
@@ -94,28 +116,6 @@ async def handle(message: types.Message):
                 new_eng = random.choice(available)
                 current_word[user_id] = new_eng
                 await message.answer(f"Переведи: {new_eng}")
-
-@dp.message(Command("learn"))
-async def learn(message: types.Message):
-    user_id = message.from_user.id
-    word = message.text.replace("/learn", "").strip().lower()
-    if user_id not in words or word not in words[user_id]:
-        await message.answer("Такого слова нет в базе.")
-        return
-    learned.setdefault(user_id, {})[word] = words[user_id][word]
-    del words[user_id][word]
-    save()
-    save_learned()
-    await message.answer(f"Выучил: {word} → {learned[user_id][word]}")
-
-@dp.message(Command("learned"))
-async def learned_list(message: types.Message):
-    user_id = message.from_user.id
-    if user_id not in learned or not learned[user_id]:
-        await message.answer("Ты пока ничего не выучил.")
-        return
-    text = "\n".join([f"{k} → {v}" for k, v in learned[user_id].items()])
-    await message.answer(f"Выученные слова:\n{text}")
 
 if __name__ == "__main__":
     asyncio.run(dp.start_polling(bot))
