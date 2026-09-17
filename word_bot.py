@@ -68,6 +68,7 @@ ALL_ACHIEVEMENTS = {
     "orator": {"name": "🎭 Оратор", "desc": "50 фраз добавлено", "need": 50, "type": "phrases"},
     "night_owl": {"name": "🌙 Полуночник", "desc": "Тренировка после 00:00", "need": 1, "type": "night"},
     "perfectionist": {"name": "🎯 Перфекционист", "desc": "10 правильных подряд", "need": 10, "type": "perfect"},
+    "reverse_master": {"name": "🔄 Мастер реверса", "desc": "10 правильных ответов в режиме «наоборот»", "need": 10, "type": "reverse"},
 }
 
 if os.path.exists(STATS_FILE):
@@ -121,6 +122,7 @@ async def check_achievements(message: types.Message, user_id: int):
     phrases_count = len(phrases.get(user_id, {}))
     streak = stats.get(user_id, {}).get("streak", 0)
     perfect = stats.get(user_id, {}).get("perfect", 0)
+    reverse = stats.get(user_id, {}).get("reverse", 0)
     new_achievements = []
 
     for key, ach in ALL_ACHIEVEMENTS.items():
@@ -142,6 +144,8 @@ async def check_achievements(message: types.Message, user_id: int):
             value = 1
         elif ach["type"] == "perfect":
             value = perfect
+        elif ach["type"] == "reverse":
+            value = reverse
 
         if value >= ach["need"]:
             unlocked.append(key)
@@ -163,6 +167,7 @@ def get_menu():
         [InlineKeyboardButton(text="📝 Добавить фразы", callback_data="menu_addphrase")],
         [InlineKeyboardButton(text="🔥 Тренировать слова", callback_data="menu_train")],
         [InlineKeyboardButton(text="🎯 Тренировать фразы", callback_data="menu_trainphrase")],
+        [InlineKeyboardButton(text="🔄 Режим «наоборот»", callback_data="menu_reverse")],
         [InlineKeyboardButton(text="🧠 Выученное", callback_data="menu_learned")],
         [InlineKeyboardButton(text="🏆 Достижения", callback_data="menu_achievements")],
         [InlineKeyboardButton(text="📊 Статистика", callback_data="menu_stats")]
@@ -259,6 +264,13 @@ async def handle_callback(call: types.CallbackQuery):
         else:
             mode[user_id] = "trainphrase"
             await call.message.answer("Погнали. Я буду кидать фразу на английском, ты — перевод.")
+
+    elif data == "menu_reverse":
+        if user_id not in words or not words[user_id]:
+            await call.message.answer("У тебя пока нет слов. Сначала добавь через /add.")
+        else:
+            mode[user_id] = "reverse"
+            await call.message.answer("Режим «наоборот». Я кидаю русское слово, ты — английский перевод.")
 
     elif data == "menu_learned":
         if user_id not in learned or not learned[user_id]:
@@ -429,6 +441,41 @@ async def handle(message: types.Message):
                 new_eng = random.choice(available)
                 current_word[user_id] = new_eng
                 await message.answer(f"Переведи: {new_eng}")
+
+    elif mode.get(user_id) == "reverse":
+        if user_id not in current_word:
+            eng = random.choice(list(words[user_id].keys()))
+            correct = words[user_id][eng]
+            current_word[user_id] = correct
+            await message.answer(f"Переведи на английский: {correct}")
+        else:
+            correct_eng = current_word[user_id]
+            # Находим русское слово по английскому
+            rus = None
+            for k, v in words[user_id].items():
+                if v == correct_eng:
+                    rus = k
+                    break
+            if text.lower() == rus.lower():
+                user_stats = stats.get(user_id, {})
+                reverse = user_stats.get("reverse", 0) + 1
+                user_stats["reverse"] = reverse
+                stats[user_id] = user_stats
+                save_stats()
+
+                await message.answer(random.choice(CORRECT_PHRASES))
+                await check_achievements(message, user_id)
+            else:
+                await message.answer(f"Не то. Правильно: {rus}")
+
+            available = [w for w in words[user_id].keys() if words[user_id][w] != correct_eng]
+            if not available:
+                await message.answer("Ты прошёл все слова! Добавь новые через /add.")
+                del current_word[user_id]
+            else:
+                new_eng = random.choice(available)
+                current_word[user_id] = words[user_id][new_eng]
+                await message.answer(f"Переведи на английский: {words[user_id][new_eng]}")
 
 if __name__ == "__main__":
     asyncio.run(dp.start_polling(bot))
