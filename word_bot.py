@@ -4,6 +4,7 @@ import json
 import os
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 TOKEN = os.getenv("BOT_TOKEN")
 
@@ -36,15 +37,26 @@ def save_learned():
     with open(LEARNED_FILE, "w", encoding="utf-8") as f:
         json.dump(learned, f, ensure_ascii=False, indent=2)
 
+# Меню с кнопками
+def get_menu():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📚 Добавить слова", callback_data="menu_add")],
+        [InlineKeyboardButton(text="🔥 Тренировать", callback_data="menu_train")],
+        [InlineKeyboardButton(text="🧠 Выученное", callback_data="menu_learned")],
+        [InlineKeyboardButton(text="📊 Статистика", callback_data="menu_stats")]
+    ])
+
 @dp.message(Command("start"))
 async def start(message: types.Message):
     await message.answer(
         "Йоу, чувак. Я твой тренажёр слов.\n"
-        "Напиши /add, чтобы добавить слова.\n"
-        "Напиши /train, чтобы тренить.\n"
-        "Напиши /learn слово, чтобы перенести его в выученные.\n"
-        "Напиши /learned, чтобы посмотреть выученные слова."
+        "Выбирай, что делаем:",
+        reply_markup=get_menu()
     )
+
+@dp.message(Command("menu"))
+async def menu(message: types.Message):
+    await message.answer("Меню:", reply_markup=get_menu())
 
 @dp.message(Command("add"))
 async def add(message: types.Message):
@@ -78,10 +90,46 @@ async def learn(message: types.Message):
 async def learned_list(message: types.Message):
     user_id = message.from_user.id
     if user_id not in learned or not learned[user_id]:
-        await message.answer("Ты пока нихуя не выучил.")
+        await message.answer("Ты пока ничего не выучил.")
         return
     text = "\n".join([f"{k} → {v}" for k, v in learned[user_id].items()])
     await message.answer(f"Выученные слова:\n{text}")
+
+# Обработка кнопок
+@dp.callback_query()
+async def handle_callback(call: types.CallbackQuery):
+    user_id = call.from_user.id
+    data = call.data
+
+    if data == "menu_add":
+        mode[user_id] = "add"
+        await call.message.answer("Кидай слова в формате: английское - русское.")
+
+    elif data == "menu_train":
+        if user_id not in words or not words[user_id]:
+            await call.message.answer("У тебя пока нет слов. Сначала добавь через /add.")
+        else:
+            mode[user_id] = "train"
+            await call.message.answer("Погнали. Я буду кидать слово на английском, ты — перевод.")
+
+    elif data == "menu_learned":
+        if user_id not in learned or not learned[user_id]:
+            await call.message.answer("Ты пока ничего не выучил.")
+        else:
+            text = "\n".join([f"{k} → {v}" for k, v in learned[user_id].items()])
+            await call.message.answer(f"Выученные слова:\n{text}")
+
+    elif data == "menu_stats":
+        total = len(words.get(user_id, {}))
+        learned_count = len(learned.get(user_id, {}))
+        await call.message.answer(
+            f"📊 Твоя статистика:\n"
+            f"Слов в базе: {total}\n"
+            f"Выучено: {learned_count}\n"
+            f"Осталось: {total}"
+        )
+
+    await call.answer()
 
 @dp.message()
 async def handle(message: types.Message):
@@ -106,7 +154,7 @@ async def handle(message: types.Message):
             eng = current_word[user_id]
             correct = words[user_id][eng]
             if text.lower() == correct.lower():
-                await message.answer("Верно! Дабл ю! 🔥")
+                await message.answer("Верно! 🔥")
             else:
                 await message.answer(f"Не то. Правильно: {correct}")
 
