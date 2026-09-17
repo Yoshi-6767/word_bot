@@ -41,7 +41,9 @@ async def start(message: types.Message):
     await message.answer(
         "Йоу, чувак. Я твой тренажёр слов.\n"
         "Напиши /add, чтобы добавить слова.\n"
-        "Напиши /train, чтобы тренить."
+        "Напиши /train, чтобы тренить.\n"
+        "Напиши /learn слово, чтобы перенести его в выученные.\n"
+        "Напиши /learned, чтобы посмотреть выученные слова."
     )
 
 @dp.message(Command("add"))
